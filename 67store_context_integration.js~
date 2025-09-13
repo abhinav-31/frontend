@@ -1,0 +1,87 @@
+// store/index.js
+export { default as store } from './store'
+export * from './store'
+
+// Export all slices
+export * from './slices/authSlice'
+export * from './slices/permissionsSlice'
+export * from './slices/uiSlice'
+export * from './slices/breadcrumbSlice'
+
+// Export all APIs
+export * from './api/authApi'
+export * from './api/academicApi'
+export * from './api/infrastructureApi'
+export * from './api/staffApi'
+export * from './api/studentsApi'
+export * from './api/schedulingApi'
+export * from './api/reportsApi'
+
+// Export all selectors
+export * from './selectors'
+
+// Export middleware
+export * from './middleware'
+
+// context/AuthContext.jsx - Enhanced with Redux integration
+import { createContext, useContext, useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { initializeAuth, checkLockout } from '../store/slices/authSlice'
+import { fetchUserPermissions } from '../store/slices/permissionsSlice'
+import { 
+  selectUser, 
+  selectIsAuthenticated, 
+  selectIsLoading,
+  selectIsAccountLocked 
+} from '../store/selectors/authSelectors'
+
+const AuthContext = createContext()
+
+export const AuthProvider = ({ children }) => {
+  const dispatch = useDispatch()
+  const user = useSelector(selectUser)
+  const isAuthenticated = useSelector(selectIsAuthenticated)
+  const isLoading = useSelector(selectIsLoading)
+  const isAccountLocked = useSelector(selectIsAccountLocked)
+
+  useEffect(() => {
+    // Initialize authentication on app start
+    dispatch(initializeAuth())
+    
+    // Check account lockout status periodically
+    const lockoutInterval = setInterval(() => {
+      dispatch(checkLockout())
+    }, 60000) // Check every minute
+
+    return () => clearInterval(lockoutInterval)
+  }, [dispatch])
+
+  useEffect(() => {
+    // Fetch user permissions when authenticated
+    if (isAuthenticated && user) {
+      dispatch(fetchUserPermissions())
+    }
+  }, [isAuthenticated, user, dispatch])
+
+  // Session activity tracking
+  useEffect(() => {
+    if (isAuthenticated) {
+      const trackActivity = () => {
+        dispatch(updateLastActivity())
+      }
+
+      // Track user activity events
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+      events.forEach(event => {
+        document.addEventListener(event, trackActivity, { passive: true })
+      })
+
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, trackActivity)
+        })
+      }
+    }
+  }, [isAuthenticated, dispatch])
+
+  
